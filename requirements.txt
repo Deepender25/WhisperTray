@@ -1,0 +1,39 @@
+# WhisperTray — Python dependencies
+# Install with:  pip install -r requirements.txt
+#
+# GPU acceleration (optional, ~4× faster transcription):
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+#   (replace cu121 with your CUDA version — see https://pytorch.org/get-started/locally/)
+
+# ── Core speech-to-text ──────────────────────────────────────────────────────
+
+# Backend A: Original OpenAI Whisper
+# Used when config.py BACKEND = "openai"
+openai-whisper>=20231117        # pulls in torch automatically
+
+# Backend B: Faster-Whisper (CTranslate2 port — recommended)
+# Used when config.py BACKEND = "faster"
+# 4-8× faster on CPU, better word accuracy, lower memory usage
+faster-whisper>=1.0.0
+
+# ── Audio capture ────────────────────────────────────────────────────────────
+sounddevice>=0.4.6
+numpy>=1.24.0
+
+# ── GUI ──────────────────────────────────────────────────────────────────────
+PyQt5>=5.15.10
+PyQt5-Qt5>=5.15.2
+
+# ── System tray ──────────────────────────────────────────────────────────────
+pystray>=0.19.5
+Pillow>=10.0.0
+
+# ── Global hotkey ────────────────────────────────────────────────────────────
+pynput>=1.7.6
+
+# ── Text injection ───────────────────────────────────────────────────────────
+pyperclip>=1.8.2
+pyautogui>=0.9.54
+
+# ── Windows integration ──────────────────────────────────────────────────────
+pywin32>=306
