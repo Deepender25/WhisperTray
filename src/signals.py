@@ -23,6 +23,9 @@ class AppSignals(QObject):
     # Emitted when recording stops and processing begins
     set_processing = pyqtSignal()
 
+    # Emitted when Whisper finishes and LLM refinement begins
+    set_refining = pyqtSignal()
+
     # Emitted when transcription is ready → inject into target window
     text_ready = pyqtSignal(str)
 

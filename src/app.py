@@ -94,6 +94,7 @@ class WhisperTrayApp:
         s.show_capsule.connect(self._show_capsule, Qt.QueuedConnection)
         s.close_capsule.connect(self._close_capsule, Qt.QueuedConnection)
         s.set_processing.connect(self._on_set_processing, Qt.QueuedConnection)
+        s.set_refining.connect(self._on_set_refining, Qt.QueuedConnection)
         s.amplitude_update.connect(self._on_amplitude, Qt.QueuedConnection)
         s.text_ready.connect(self._on_text_ready, Qt.QueuedConnection)
         s.quit_app.connect(self._quit, Qt.QueuedConnection)
@@ -142,6 +143,11 @@ class WhisperTrayApp:
             name="transcriber",
         ).start()
 
+    def _on_set_refining(self) -> None:
+        """Switch capsule to LLM refining state."""
+        if self._capsule:
+            self._capsule.set_refining()
+
     def _on_amplitude(self, value: float) -> None:
         if self._capsule:
             self._capsule.update_amplitude(value)
@@ -181,6 +187,14 @@ class WhisperTrayApp:
                     os.unlink(audio_path)
                 except OSError:
                     pass
+                    
+        # Apply optional LLM refinement
+        from . import config
+        from .llm import refine_text
+        if text and getattr(config, "LLM_ENABLED", False):
+            self.signals.set_refining.emit()
+            text = refine_text(text)
+
         self.signals.text_ready.emit(text)
 
     # ── helpers ───────────────────────────────────────────────────────────

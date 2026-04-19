@@ -88,3 +88,25 @@ NO_SPEECH_THRESHOLD: float = 0.5
 # Beam size for decoding (faster-whisper only).
 # 1 = greedy (fastest), 5 = beam search (more accurate, slower)
 BEAM_SIZE: int = 5
+
+
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │  LLM TEXT REFINEMENT (Optional)                                         │
+# └─────────────────────────────────────────────────────────────────────────┘
+
+# Enable or disable post-processing raw transcription via an LLM API
+LLM_ENABLED: bool = True
+
+# Standard OpenAI-schema URL (e.g., Groq, vLLM, LM Studio, OpenAI)
+LLM_BASE_URL: str = "https://api.groq.com/openai/v1"
+
+# The model to use. For low latency, a fast 8b model on Groq is recommended
+LLM_MODEL: str = "openai/gpt-oss-20b"
+
+# Instructions applied to the transcript before injecting it
+LLM_SYSTEM_PROMPT: str = (
+    "You are an assistant designed to refine dictated speech. "
+    "Fix any obvious grammar, spelling, or punctuation errors. "
+    "Do NOT change the original meaning, and do NOT add conversational filler. "
+    "Just output the corrected string."
+)

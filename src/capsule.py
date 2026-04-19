@@ -48,6 +48,7 @@ BAR_QUIET = QColor(55, 55, 55, 200)
 DOT_REC = QColor(239, 68, 68)
 DOT_PROC = QColor(245, 158, 11)
 DOT_DONE = QColor(34, 197, 94)
+DOT_LLM = QColor(59, 130, 246)
 
 # Slide-in / fade animation
 ANIM_STEPS = 20        # frames for entrance / exit
@@ -98,6 +99,7 @@ class CapsuleWidget(QWidget):
         self.targets = np.zeros(NUM_BARS, dtype=float)
         self.is_recording = True
         self.is_processing = False
+        self.is_refining = False
         self._phase = 0.0    # general phase clock for pulsing effects
 
     def _position_on_screen(self) -> None:
@@ -122,7 +124,15 @@ class CapsuleWidget(QWidget):
         """Switch to the 'transcribing' visual state."""
         self.is_recording = False
         self.is_processing = True
+        self.is_refining = False
         self.targets[:] = 0.25
+
+    def set_refining(self) -> None:
+        """Switch to the 'LLM refining' visual state."""
+        self.is_recording = False
+        self.is_processing = False
+        self.is_refining = True
+        self.targets[:] = 0.15
 
     def close_animated(self) -> None:
         """Trigger fade-out, then emit closed and hide."""
@@ -175,6 +185,11 @@ class CapsuleWidget(QWidget):
                         0.5 + 0.5 * math.sin(self._phase * 1.2 + i * 0.35)
                     )
                     self.targets[i] = proc
+                elif self.is_refining:
+                    ref = 0.15 * envelope * (
+                        0.5 + 0.5 * math.sin(self._phase * 0.8 + i * 0.5)
+                    )
+                    self.targets[i] = ref
                 else:
                     self.targets[i] = idle
 
@@ -230,6 +245,10 @@ class CapsuleWidget(QWidget):
                 phase = (self._phase * 0.9 + i * 0.28) % (2 * math.pi)
                 brightness = int(80 + 70 * math.sin(phase))
                 color = QColor(brightness, int(brightness * 0.75), 20, 200)
+            elif self.is_refining:
+                phase = (self._phase * 0.7 + i * 0.4) % (2 * math.pi)
+                brightness = int(100 + 50 * math.sin(phase))
+                color = QColor(20, brightness, 240, 200)
             elif self.is_recording and amp > 0.05:
                 brightness = int(150 + 90 * amp)
                 color = QColor(brightness, brightness, brightness, 255)
@@ -253,6 +272,11 @@ class CapsuleWidget(QWidget):
             pulse = 0.5 + 0.5 * math.sin(self._phase * 1.5)
             alpha = int(150 + 105 * pulse)
             color = QColor(DOT_PROC.red(), DOT_PROC.green(), DOT_PROC.blue(), alpha)
+            r = 4.5
+        elif self.is_refining:
+            pulse = 0.5 + 0.5 * math.sin(self._phase * 1.8)
+            alpha = int(150 + 105 * pulse)
+            color = QColor(DOT_LLM.red(), DOT_LLM.green(), DOT_LLM.blue(), alpha)
             r = 4.5
         elif self.is_recording:
             pulse = 0.5 + 0.5 * math.sin(self._phase * 2.2)

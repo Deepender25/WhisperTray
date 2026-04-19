@@ -5,10 +5,14 @@ Press Ctrl+Shift+Q in any text box to start voice dictation.
 
 import sys
 import os
+from dotenv import load_dotenv
 
 if sys.platform != "win32":
     print("WhisperTray currently supports Windows only.")
     sys.exit(1)
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Enable high-DPI awareness before Qt initialises
 import ctypes
