@@ -40,11 +40,12 @@ DAMPING = 0.55         # velocity damping (higher = less bouncy)
 FRAME_MS = 14          # ~70 fps
 
 # Colour palette
-BG_ALPHA = 215
-BG_DARK_START = QColor(25, 25, 28, BG_ALPHA)
-BG_DARK_END = QColor(12, 12, 14, int(BG_ALPHA * 1.1))
-BORDER_TOP = QColor(255, 255, 255, 45)
-BORDER_BOTTOM = QColor(255, 255, 255, 10)
+# Pure Clear Frosted Glass properties (No black tint)
+BG_GLASS_TOP = QColor(255, 255, 255, 25)
+BG_GLASS_MID = QColor(255, 255, 255, 15)
+BG_GLASS_BOT = QColor(255, 255, 255, 5)
+BORDER_TOP = QColor(255, 255, 255, 140)    # Strong upper glossy reflection
+BORDER_BOTTOM = QColor(255, 255, 255, 30)  # Faded bottom edge
 BAR_ACTIVE = QColor(255, 255, 255, 255)
 BAR_QUIET = QColor(80, 80, 90, 160)
 DOT_REC = QColor(244, 63, 94)    # Rose 500
@@ -97,6 +98,15 @@ class CapsuleWidget(QWidget):
 
     def _init_state(self) -> None:
         self.amplitudes = np.zeros(NUM_BARS, dtype=float)
+        
+        # Pre-generate high quality noise texture for Frosted Glass effect
+        arr = np.zeros((H, W, 4), dtype=np.uint8)
+        arr[..., 0:3] = 255  # White noise
+        # Make the frost slightly stronger since there's no dark tint anymore
+        arr[..., 3] = np.random.randint(0, 35, (H, W), dtype=np.uint8)
+        from PyQt5.QtGui import QImage, QPixmap
+        img = QImage(arr.data, W, H, W * 4, QImage.Format_ARGB32).copy()
+        self._noise_pixmap = QPixmap.fromImage(img)
         self.velocities = np.zeros(NUM_BARS, dtype=float)
         self.targets = np.zeros(NUM_BARS, dtype=float)
         self.is_recording = True
@@ -217,21 +227,38 @@ class CapsuleWidget(QWidget):
         painter.end()
 
     def _draw_capsule(self, p: QPainter) -> None:
+        # High quality anti-aliasing!
+        p.setRenderHint(QPainter.Antialiasing)
+        
         path = QPainterPath()
         path.addRoundedRect(QRectF(1, 1, W - 2, H - 2), RADIUS, RADIUS)
 
-        # Background fill (Glass-like gradient)
+        # 1. Clear glass gradient (No dark tint)
         bg_grad = QLinearGradient(0, 0, 0, H)
-        bg_grad.setColorAt(0.0, BG_DARK_START)
-        bg_grad.setColorAt(1.0, BG_DARK_END)
+        bg_grad.setColorAt(0.0, BG_GLASS_TOP)
+        bg_grad.setColorAt(0.5, BG_GLASS_MID)
+        bg_grad.setColorAt(1.0, BG_GLASS_BOT)
         p.fillPath(path, bg_grad)
 
-        # Subtle premium border (brighter at top)
+        # 2. Textured Glass effect (Frosted Noise)
+        p.save()
+        p.setClipPath(path)
+        p.drawPixmap(0, 0, self._noise_pixmap)
+        p.restore()
+
+        # 3. Inner reflection (simulates the 3D depth of glass edges)
+        inner_path = QPainterPath()
+        inner_path.addRoundedRect(QRectF(2, 2, W - 4, H - 4), RADIUS - 1, RADIUS - 1)
+        inner_pen = QPen(QColor(255, 255, 255, 35), 1.0)
+        p.setPen(inner_pen)
+        p.drawPath(inner_path)
+
+        # 4. Outer rim Premium glass border
         border_grad = QLinearGradient(0, 0, 0, H)
         border_grad.setColorAt(0.0, BORDER_TOP)
         border_grad.setColorAt(1.0, BORDER_BOTTOM)
         
-        pen = QPen(QBrush(border_grad), 1.2)
+        pen = QPen(QBrush(border_grad), 1.5)
         p.setPen(pen)
         p.drawPath(path)
 
