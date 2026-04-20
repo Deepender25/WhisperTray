@@ -16,6 +16,7 @@ import logging
 import os
 import sys
 import threading
+import time
 from typing import Optional
 
 from PyQt5.QtCore import Qt, QTimer
@@ -23,7 +24,7 @@ from PyQt5.QtWidgets import QApplication
 
 from .capsule import CapsuleWidget
 from .hotkey import HotkeyListener
-from .injector import get_foreground_hwnd, inject_text
+from .injector import get_foreground_hwnd, inject_text, is_text_field_focused
 from .recorder import AudioRecorder
 from .signals import AppSignals
 from .tray import TrayApp
@@ -50,7 +51,10 @@ class WhisperTrayApp:
             on_amplitude=self._emit_amplitude,
             on_auto_stop=self._on_auto_stop,
         )
-        self._hotkey = HotkeyListener(callback=self._on_hotkey_fired)
+        self._hotkey = HotkeyListener(
+            callback=self._on_hotkey_fired,
+            on_any_press=self._on_any_key,
+        )
         self._tray = TrayApp(on_quit=self._quit)
 
         # State
@@ -58,6 +62,7 @@ class WhisperTrayApp:
         self._active = False            # is a session in progress?
         self._active_lock = threading.Lock()
         self._target_hwnd: Optional[int] = None
+        self._session_start_time: float = 0.0
 
     # ── startup / shutdown ────────────────────────────────────────────────
 
@@ -97,6 +102,7 @@ class WhisperTrayApp:
         s.set_refining.connect(self._on_set_refining, Qt.QueuedConnection)
         s.amplitude_update.connect(self._on_amplitude, Qt.QueuedConnection)
         s.text_ready.connect(self._on_text_ready, Qt.QueuedConnection)
+        s.show_toast.connect(self._show_toast, Qt.QueuedConnection)
         s.quit_app.connect(self._quit, Qt.QueuedConnection)
 
     # ── hotkey & session control (may be called from any thread) ──────────
@@ -107,10 +113,40 @@ class WhisperTrayApp:
                 # Second press → stop recording
                 self.signals.set_processing.emit()
             else:
+                if not is_text_field_focused():
+                    self.signals.show_toast.emit("No text box selected")
+                    return
+                
                 self._active = True
+                self._session_start_time = time.time()
                 # Capture focused window *now*, before capsule steals focus
                 self._target_hwnd = get_foreground_hwnd()
                 self.signals.show_capsule.emit()
+
+    def _on_any_key(self, key) -> None:
+        """Called on any keypress to prematurely abort and submit."""
+        with self._active_lock:
+            if not self._active:
+                return
+            
+            from pynput.keyboard import Key, KeyCode
+            
+            # Grace period: ignore all keypresses within 0.8 seconds of activation.
+            # This prevents the initial hotkey (and its auto-repeats or release bounces) 
+            # from instantly terminating the session.
+            if time.time() - self._session_start_time < 0.8:
+                return
+            
+            # Ignore the hotkey modifiers themselves when holding them
+            if key in (Key.ctrl, Key.ctrl_l, Key.ctrl_r, Key.shift, Key.shift_l, Key.shift_r, Key.alt, Key.alt_l, Key.alt_r, Key.cmd, Key.cmd_l, Key.cmd_r):
+                return
+            
+            # Avoid the target key 'q' or 'Q' or '\x11' (Ctrl+Q) if the user is holding it
+            if getattr(key, 'char', None) in ('q', 'Q', '\x11'):
+                return
+
+            # Note: Emit stop recording and process text
+            self.signals.set_processing.emit()
 
     def _on_auto_stop(self) -> None:
         """Recorder detected end-of-speech; trigger stop."""
@@ -133,6 +169,10 @@ class WhisperTrayApp:
 
     def _on_set_processing(self) -> None:
         """Stop recording and switch capsule to processing state."""
+        # Prevent double-firing set_processing
+        if not self._recorder._recording and self._capsule and self._capsule.is_processing:
+            return
+            
         self._recorder.stop()
         if self._capsule:
             self._capsule.set_processing()
@@ -173,6 +213,11 @@ class WhisperTrayApp:
         self._capsule = None
         with self._active_lock:
             self._active = False
+
+    def _show_toast(self, msg: str) -> None:
+        from .toast import ToastWidget
+        self._toast = ToastWidget(msg)
+        self._toast.show()
 
     # ── background transcription ──────────────────────────────────────────
 

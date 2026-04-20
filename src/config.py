@@ -95,7 +95,7 @@ BEAM_SIZE: int = 5
 # └─────────────────────────────────────────────────────────────────────────┘
 
 # Enable or disable post-processing raw transcription via an LLM API
-LLM_ENABLED: bool = True
+LLM_ENABLED: bool = False
 
 # Standard OpenAI-schema URL (e.g., Groq, vLLM, LM Studio, OpenAI)
 LLM_BASE_URL: str = "https://api.groq.com/openai/v1"

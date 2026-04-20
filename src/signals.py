@@ -31,3 +31,6 @@ class AppSignals(QObject):
 
     # Emitted by tray "Quit" action → shut everything down
     quit_app = pyqtSignal()
+
+    # Emitted to show an error popup
+    show_toast = pyqtSignal(str)

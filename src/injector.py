@@ -34,6 +34,66 @@ def get_foreground_hwnd() -> Optional[int]:
     return hwnd if hwnd else None
 
 
+def is_text_field_focused() -> bool:
+    """
+    Check if the current focused UI element appears to be a text input.
+    Returns True if a text field is focused, False otherwise.
+    """
+    try:
+        import uiautomation as auto
+    except ImportError:
+        logger.warning("uiautomation not installed; assuming text focus.")
+        return True
+
+    try:
+        control = auto.GetFocusedControl()
+        if not control:
+            return False
+
+        # Common text control types
+        c_type = control.ControlType
+        if c_type in (auto.ControlType.EditControl, auto.ControlType.DocumentControl, auto.ControlType.ComboBoxControl):
+            return True
+
+        # Fallback: check if the control supports Text or Value patterns
+        # Some custom apps (like Chromium/Electron) might expose TextPattern 
+        # on their main document element.
+        try:
+            if hasattr(control, 'GetSupportedPatternIds'):
+                patterns = control.GetSupportedPatternIds()
+                if auto.PatternId.TextPattern in patterns or auto.PatternId.ValuePattern in patterns:
+                    return True
+        except Exception as exc:
+            pass # Gracefully ignore 
+
+        # Edge cases for some web browsers or terminals where control is generic
+        # but class name implies text.
+        c_class = control.ClassName.lower()
+        if "edit" in c_class or "scintilla" in c_class or "text" in c_class:
+            return True
+        
+        # Chromium / Electron applications (VS Code, Chrome, Edge, Obsidian, Discord)
+        if "chrome_renderwidgethost" in c_class or "chrome_widget" in c_class or "intermediate d3d" in c_class:
+            return True
+
+        # Windows Terminal and Console
+        if "console" in c_class or "tty" in c_class or "pty" in c_class or "term" in c_class or "cascadia" in c_class:
+            return True
+            
+        # Parent check often helps for complex WPF or UIA apps where focus is deep inside
+        try:
+            parent = control.GetParentControl()
+            if parent and parent.ControlType in (auto.ControlType.EditControl, auto.ControlType.DocumentControl):
+                return True
+        except Exception:
+            pass
+
+        return False
+    except Exception as exc:
+        logger.warning("Failed to determine text focus: %s", exc)
+        return True  # Fallback to allow if determination errors out
+
+
 def _restore_focus(hwnd: int) -> None:
     """Bring a window back to the foreground."""
     # IsIconic = minimised; restore first

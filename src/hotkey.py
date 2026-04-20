@@ -19,8 +19,9 @@ HOTKEY_COMBO = "<ctrl>+<shift>+q"
 class HotkeyListener:
     """Registers a global hotkey and calls `callback` when it fires."""
 
-    def __init__(self, callback: Callable[[], None]) -> None:
+    def __init__(self, callback: Callable[[], None], on_any_press: Callable[[any], None] = None) -> None:
         self._callback = callback
+        self._on_any_press = on_any_press
         self._hotkey: _kb.HotKey | None = None
         self._listener: _kb.Listener | None = None
         self._lock = threading.Lock()
@@ -54,6 +55,9 @@ class HotkeyListener:
                     self._hotkey.press(self._listener.canonical(key))
                 except Exception:
                     pass   # pynput can raise on some special keys
+            
+            if self._on_any_press:
+                self._on_any_press(key)
 
     def _handle_release(self, key) -> None:
         with self._lock:

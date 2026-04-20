@@ -40,18 +40,20 @@ DAMPING = 0.55         # velocity damping (higher = less bouncy)
 FRAME_MS = 14          # ~70 fps
 
 # Colour palette
-BG_ALPHA = 245
-BG_DARK = QColor(10, 10, 10, BG_ALPHA)
-BORDER_COLOR = QColor(255, 255, 255, 18)
-BAR_ACTIVE = QColor(240, 240, 240, 255)
-BAR_QUIET = QColor(55, 55, 55, 200)
-DOT_REC = QColor(239, 68, 68)
-DOT_PROC = QColor(245, 158, 11)
-DOT_DONE = QColor(34, 197, 94)
-DOT_LLM = QColor(59, 130, 246)
+BG_ALPHA = 215
+BG_DARK_START = QColor(25, 25, 28, BG_ALPHA)
+BG_DARK_END = QColor(12, 12, 14, int(BG_ALPHA * 1.1))
+BORDER_TOP = QColor(255, 255, 255, 45)
+BORDER_BOTTOM = QColor(255, 255, 255, 10)
+BAR_ACTIVE = QColor(255, 255, 255, 255)
+BAR_QUIET = QColor(80, 80, 90, 160)
+DOT_REC = QColor(244, 63, 94)    # Rose 500
+DOT_PROC = QColor(245, 158, 11)  # Amber 500
+DOT_DONE = QColor(34, 197, 94)   # Emerald 500
+DOT_LLM = QColor(56, 189, 248)   # Sky 400
 
 # Slide-in / fade animation
-ANIM_STEPS = 20        # frames for entrance / exit
+ANIM_STEPS = 24        # frames for entrance / exit
 ANIM_INTERVAL_MS = 12
 
 
@@ -216,14 +218,20 @@ class CapsuleWidget(QWidget):
 
     def _draw_capsule(self, p: QPainter) -> None:
         path = QPainterPath()
-        path.addRoundedRect(QRectF(0.5, 0.5, W - 1, H - 1), RADIUS, RADIUS)
+        path.addRoundedRect(QRectF(1, 1, W - 2, H - 2), RADIUS, RADIUS)
 
-        # Background fill
-        p.fillPath(path, BG_DARK)
+        # Background fill (Glass-like gradient)
+        bg_grad = QLinearGradient(0, 0, 0, H)
+        bg_grad.setColorAt(0.0, BG_DARK_START)
+        bg_grad.setColorAt(1.0, BG_DARK_END)
+        p.fillPath(path, bg_grad)
 
-        # Subtle border
-        pen = QPen(BORDER_COLOR)
-        pen.setWidthF(1.0)
+        # Subtle premium border (brighter at top)
+        border_grad = QLinearGradient(0, 0, 0, H)
+        border_grad.setColorAt(0.0, BORDER_TOP)
+        border_grad.setColorAt(1.0, BORDER_BOTTOM)
+        
+        pen = QPen(QBrush(border_grad), 1.2)
         p.setPen(pen)
         p.drawPath(path)
 
@@ -243,19 +251,32 @@ class CapsuleWidget(QWidget):
 
             if self.is_processing:
                 phase = (self._phase * 0.9 + i * 0.28) % (2 * math.pi)
-                brightness = int(80 + 70 * math.sin(phase))
-                color = QColor(brightness, int(brightness * 0.75), 20, 200)
+                brightness = int(120 + 90 * math.sin(phase))
+                color = QColor(brightness, int(brightness * 0.75), 40, 220)
             elif self.is_refining:
                 phase = (self._phase * 0.7 + i * 0.4) % (2 * math.pi)
-                brightness = int(100 + 50 * math.sin(phase))
-                color = QColor(20, brightness, 240, 200)
+                brightness = int(120 + 80 * math.sin(phase))
+                color = QColor(40, int(brightness * 0.8), brightness, 220)
             elif self.is_recording and amp > 0.05:
-                brightness = int(150 + 90 * amp)
+                brightness = int(180 + 75 * amp)
                 color = QColor(brightness, brightness, brightness, 255)
             else:
                 color = BAR_QUIET
+                
+            # Add a subtle glow to active bars
+            if amp > 0.2 and (self.is_recording or self.is_processing or self.is_refining):
+                p.setPen(Qt.NoPen)
+                glow_color = QColor(color)
+                glow_color.setAlpha(40)
+                p.setBrush(glow_color)
+                bw_glow = float(BAR_W) * 2.5
+                p.drawRoundedRect(
+                    QRectF(x - bw_glow / 2, cy - bar_h / 2, bw_glow, bar_h),
+                    bw_glow / 2, bw_glow / 2
+                )
 
             p.setBrush(color)
+            p.setPen(Qt.NoPen)
             # Rounded-cap bars via drawRoundedRect
             bw = float(BAR_W)
             p.drawRoundedRect(
